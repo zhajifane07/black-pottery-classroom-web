@@ -1,1 +1,1 @@
-window.POTTERY_API_ORIGIN='https://black-pottery-classroom.black-pottery-classroom.workers.dev';
+window.POTTERY_API_ORIGIN='https://x4z73zf4sp.coze.site';

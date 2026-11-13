@@ -44,6 +44,65 @@
   const material=new T.MeshLambertMaterial({map:texture,color:0xc6c6c6,side:T.DoubleSide});
   const teachingMaterial=new T.MeshPhongMaterial({color:0x262923,specular:0x857c61,shininess:45,side:T.DoubleSide});
   const vessel=new T.Mesh(geometry,material);scene.add(vessel);
+  // Single-view references define silhouettes. Hidden sides use continuous teaching ornament.
+  const profiles={
+   jar:[[.05,-1.45],[.43,-1.45],[.66,-1.25],[.91,-.91],[1.05,-.48],[1.08,-.15],[.99,.23],[.76,.59],[.5,.82],[.44,1.05],[.43,1.4],[.47,1.45]],
+   goblet:[[.02,-1.45],[.45,-1.45],[.4,-1.37],[.13,-1.28],[.1,-.88],[.27,-.75],[.29,-.51],[.23,-.28],[.1,-.17],[.08,.56],[.28,.67],[.38,.87],[.4,1.25],[.57,1.45]],
+   openwork:[[.03,-1.45],[.42,-1.45],[.39,-1.31],[.58,-1.14],[.72,-.75],[.78,-.1],[.73,.55],[.6,.9],[.24,1.16],[.12,1.25],[.12,1.39],[.21,1.45]],
+   bird:[[.03,-1.45],[.43,-1.45],[.32,-1.15],[.29,-.74],[.36,-.39],[.62,.06],[.76,.58],[.72,1.04],[.49,1.39],[.16,1.62],[.14,1.9],[.21,1.97]],
+   dragon:[[.03,-1.45],[.45,-1.45],[.44,-1.28],[.24,-1.22],[.15,-1.09],[.25,-.94],[.39,-.65],[.43,-.3],[.37,.03],[.23,.24],[.14,.45],[.34,.6],[.45,.88],[.47,1.24],[.63,1.45]]
+  };
+  const names={jar:'素面鼓腹罐',goblet:'细柄高足杯',openwork:'镂空长颈瓶',bird:'鸟饰镂空瓶',dragon:'描金高足杯'};
+  const galleryCache=new Map();let galleryId='';
+  const ornament=new T.Group();scene.add(ornament);
+  const birdMat=new T.MeshPhongMaterial({color:0x252d2e,specular:0xb7b4a2,shininess:62});
+  function ellipsoid(x,y,z,a,b,c){const m=new T.Mesh(new T.SphereGeometry(1,24,16),birdMat);m.position.set(x,y,z);m.scale.set(a,b,c);ornament.add(m);return m;}
+  ellipsoid(0,2.1,0,.31,.18,.15);ellipsoid(.22,2.29,0,.13,.13,.12);
+  const beak=new T.Mesh(new T.ConeGeometry(.065,.22,16),birdMat);beak.rotation.z=-Math.PI/2;beak.position.set(.4,2.28,0);ornament.add(beak);
+  const tail=ellipsoid(-.32,2.18,0,.28,.075,.13);tail.rotation.z=-.5;
+  const eyeMat=new T.MeshBasicMaterial({color:0xc7b482});for(const z of [-.112,.112]){const eye=new T.Mesh(new T.SphereGeometry(.022,10,8),eyeMat);eye.position.set(.26,2.32,z);ornament.add(eye);}
+  ornament.visible=false;
+  function galleryModel(id){
+   if(galleryCache.has(id))return galleryCache.get(id);
+   const profile=profiles[id]||profiles.jar;
+   const curve=new T.CatmullRomCurve3(profile.map(([r,y])=>new T.Vector3(r,y,0)),false,'centripetal');
+   const outer=curve.getPoints(72).map(v=>new T.Vector2(Math.max(.015,v.x),v.y));
+   const lip=outer.at(-1),bottom=outer[0];
+   const inside=outer.slice().reverse().map(v=>new T.Vector2(Math.max(.01,v.x-.045),Math.max(bottom.y+.07,v.y-.012)));
+   const shape=[new T.Vector2(0,bottom.y),...outer,new T.Vector2(lip.x-.035,lip.y),...inside,new T.Vector2(0,bottom.y+.07)];
+   const g=new T.LatheGeometry(shape,96),cv=document.createElement('canvas');cv.width=1024;cv.height=1024;
+   for(let i=0;i<g.attributes.position.count;i++)g.attributes.uv.setY(i,(g.attributes.position.getY(i)-bottom.y)/(lip.y-bottom.y));
+   const c=cv.getContext('2d');c.fillStyle='#303536';c.fillRect(0,0,1024,1024);
+   // Fine horizontal wheel lines run all the way around the vessel.
+   for(let y=0;y<1024;y+=3){c.strokeStyle=y%9===0?'#55584f':'#272e2f';c.globalAlpha=.3;c.beginPath();c.moveTo(0,y);c.lineTo(1024,y);c.stroke();}c.globalAlpha=1;
+   if(id!=='jar'){
+    for(const y of [170,185,810,825]){c.strokeStyle='#a6a08a';c.globalAlpha=.6;c.lineWidth=2;c.beginPath();c.moveTo(0,y);c.lineTo(1024,y);c.stroke();}c.globalAlpha=1;
+    if(id==='openwork'||id==='bird'){
+     // Cutout alpha creates openings on front AND back, instead of a single flat front decal.
+     for(let col=0;col<16;col++)for(let row=0;row<8;row++){
+      const x=col*64+32+(row%2)*14,y=255+row*62;
+      c.save();c.translate(x,y);c.rotate((col%2?1:-1)*.5);c.globalCompositeOperation='destination-out';c.beginPath();c.ellipse(0,0,9,23,0,0,Math.PI*2);c.fill();c.restore();
+      c.strokeStyle='#777b6c';c.lineWidth=1;c.beginPath();c.moveTo(x-22,y+24);c.quadraticCurveTo(x,y-26,x+22,y+24);c.stroke();
+     }
+    }else if(id==='goblet'){
+     for(let x=0;x<1024;x+=32)for(let y=590;y<760;y+=27){c.save();c.globalCompositeOperation='destination-out';c.beginPath();c.ellipse(x+(y%2)*8,y,3,7,0,0,Math.PI*2);c.fill();c.restore();}
+    }else if(id==='dragon'){
+     c.strokeStyle='#d4b462';c.lineWidth=7;c.shadowColor='#e5cb85';c.shadowBlur=2;
+     for(let k=0;k<4;k++){const x=k*256;c.beginPath();c.moveTo(x+40,720);c.bezierCurveTo(x+230,640,x+15,570,x+166,450);c.bezierCurveTo(x+240,370,x+45,340,x+150,235);c.stroke();c.beginPath();c.moveTo(x+150,235);c.lineTo(x+180,214);c.lineTo(x+197,227);c.lineTo(x+183,249);c.stroke();for(let j=0;j<5;j++){c.beginPath();c.moveTo(x+105,320+j*70);c.lineTo(x+60,305+j*70);c.lineTo(x+41,286+j*70);c.stroke();}}c.shadowBlur=0;
+    }
+   }
+   const map=new T.CanvasTexture(cv);map.colorSpace=T.SRGBColorSpace;map.anisotropy=4;
+   const m=new T.MeshPhongMaterial({map,color:0xd3d5c9,specular:0x6f7e7c,shininess:38,side:T.DoubleSide,alphaTest:.5});
+   const model={geometry:g,material:m};galleryCache.set(id,model);return model;
+  }
+  function applyGallery(teaching=false){
+   const id=window.potteryGalleryId||'jar';ornament.visible=!teaching&&id==='bird';
+   if(teaching){vessel.geometry=geometry;vessel.material=teachingMaterial;base.position.y=-1.51;}
+   else {const model=galleryModel(id);vessel.geometry=model.geometry;vessel.material=model.material;base.position.y=-1.51;}
+   if(!teaching&&galleryId!==id){galleryId=id;Object.assign(target,{yaw:0,pitch:.09,distance:id==='bird'?8.5:7.1});}
+   if(!teaching)document.querySelector('#view-name').textContent=names[id]+' · 照片参考教学重建';
+  }
+
   const base=new T.Mesh(new T.CylinderGeometry(1.38,1.43,.09,48),new T.MeshLambertMaterial({color:0x1b252c}));base.position.y=-1.51;scene.add(base);
   scene.add(new T.HemisphereLight(0xf7f1df,0x676056,2.7));const key=new T.DirectionalLight(0xfff0d6,1.6);key.position.set(-3,5,4);scene.add(key);const rim=new T.DirectionalLight(0xc8dded,1.4);rim.position.set(3,2,-3);scene.add(rim);
   const state={yaw:0,pitch:.06,distance:6.8},target={...state};let frame=0,lastTime=0,lastWidth=0,lastHeight=0,dragging=false;
@@ -56,7 +115,7 @@
   function release(e){pointers.delete(e.pointerId);pinch=0;dragging=pointers.size>0;schedule()}
   for(const name of ['pointerup','pointercancel','lostpointercapture'])canvas.addEventListener(name,release);
   canvas.addEventListener('wheel',e=>{e.preventDefault();target.distance=Math.max(4.7,Math.min(10,target.distance+e.deltaY*.005));schedule()},{passive:false});
-  for(const button of document.querySelectorAll('[data-view]')){button.onclick=()=>{for(const b of document.querySelectorAll('[data-view]'))b.setAttribute('aria-pressed',String(b===button));target.pitch=button.dataset.view==='俯视'?1.55:0;target.yaw=button.dataset.view==='左视'?-Math.PI/2:0;document.querySelector('#view-name').textContent=button.dataset.view+' · 九鱼瓶';schedule()}}
+  for(const button of document.querySelectorAll('[data-view]')){button.onclick=()=>{for(const b of document.querySelectorAll('[data-view]'))b.setAttribute('aria-pressed',String(b===button));target.pitch=button.dataset.view==='俯视'?1.55:0;target.yaw=button.dataset.view==='左视'?-Math.PI/2:0;document.querySelector('#view-name').textContent=button.dataset.view+' · '+names[window.potteryGalleryId||'jar'];schedule()}}
   const controls=document.createElement('div');controls.className='controls model-controls';for(const [text,action]of [['放大',()=>target.distance=Math.max(4.7,target.distance-.6)],['缩小',()=>target.distance=Math.min(10,target.distance+.6)],['复位',()=>Object.assign(target,{yaw:0,pitch:.06,distance:6.8})]]){const button=document.createElement('button');button.textContent=text;button.onclick=()=>{action();schedule()};controls.append(button)}figure.after(controls);
   new ResizeObserver(()=>schedule()).observe(figure);addEventListener('hashchange',()=>{lastTime=0;schedule()});document.addEventListener('visibilitychange',()=>{lastTime=0;schedule()});
   let patternLeft,patternRight,axisLine,patternTexture;
@@ -95,7 +154,7 @@
   async function applyPattern(){
    const view=window.potteryLessonView||{mode:'original'};
    const teaching=view.mode==='teaching'&&['fold','challenge'].includes(view.chapter);
-   vessel.material=teaching?teachingMaterial:material;document.querySelector('#view-name').textContent=teaching?(view.folded?'纹样薄片 · 左半向右对折':'同款器形 · 教学施纹'):'九鱼瓶 · 实物照片参考重建';window.potteryPatternRoot.visible=teaching;axisLine.visible=teaching&&view.showAxis;
+   applyGallery(teaching);document.querySelector('#view-name').textContent=teaching?(view.folded?'纹样薄片 · 左半向右对折':'同款器形 · 教学施纹'):names[window.potteryGalleryId||'jar']+' · 照片参考教学重建';window.potteryPatternRoot.visible=teaching;axisLine.visible=teaching&&view.showAxis;
    foldTarget=teaching&&view.folded?1:0;
    if(teaching){
     const motif=window.POTTERY_MOTIFS.find(m=>m.id===view.motifId);
@@ -119,6 +178,7 @@
    if(host){host.append(figure,controls);lastWidth=0;lastHeight=0;lastTime=0;window.potteryPatternReady=applyPattern();schedule()}
   }
   document.addEventListener('lesson:route',mount);document.addEventListener('pottery:pattern',()=>{if(patternLeft)window.potteryPatternReady=applyPattern()});
+  document.addEventListener('pottery:gallery',()=>{if(window.potteryLessonView?.chapter==='observe'){applyGallery(false);schedule();}});
   initializePattern();
   stats.ready=true;stats.vertexCount=pos.count;stats.textureSize=1024;schedule();
   window.potteryModel={target,schedule,snapshot:()=>{resize();renderer.render(scene,camera);return canvas.toDataURL('image/png')},geometry,textureCanvas};

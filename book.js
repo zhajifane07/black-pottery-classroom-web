@@ -25,7 +25,7 @@
     backdrop.animate([{opacity:1},{opacity:0}],{duration:1100,fill:'forwards'});
     for(const el of document.querySelectorAll('header,footer,.chapter-nav'))el.animate([{opacity:0},{opacity:1}],{delay:650,duration:600,fill:'both'});
     await Promise.all([bookMotion.finished,volumeMotion.finished,faceMotion.finished]);
-    scene.style.display='none';bookMotion.cancel();
+    scene.style.display='none';bookMotion.cancel();back.replaceChildren();
    }else{document.body.classList.remove('closed');scene.style.display='none'}
    document.dispatchEvent(new CustomEvent('lesson:route',{detail:{id:book.id}}));
   }finally{busy=false;button.disabled=false}
