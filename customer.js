@@ -14,9 +14,10 @@
  $('#topic-body').classList.add('story-subtitle');
  $('#listen').textContent='▶ 听小陶介绍';
  const discovery=document.createElement('p');discovery.className='story-discovery';$('#listen').after(discovery);
- let narration=null,topic=0;const visited=new Set();
- function stopGuide(){narration?.pause();$('.guide-stage').classList.remove('speaking');$('#listen').textContent='▶ 再听一次';}
- function playGuide(){stopGuide();document.dispatchEvent(new Event('guide:play'));narration=new Audio('audio/story-'+(topic+1)+'.mp3');$('.guide-stage').classList.add('speaking');$('#listen').textContent='Ⅱ 暂停介绍';narration.onended=stopGuide;narration.onerror=()=>{stopGuide();discovery.textContent='语音暂未加载，故事文字可以直接阅读。';};narration.play().catch(()=>{stopGuide();discovery.textContent='再点“听小陶介绍”播放语音。';});}
+ let narration=null,topic=0,storyPlayback=0;const visited=new Set();
+ window.potteryGuide={get audio(){return narration;}};
+ function stopGuide(){storyPlayback++;narration?.pause();$('.guide-stage').classList.remove('speaking');$('#listen').textContent='▶ 再听一次';}
+ function playGuide(){stopGuide();document.dispatchEvent(new Event('guide:play'));const version=storyPlayback;const track=new Audio('audio/story-'+(topic+1)+'.mp3');narration=track;$('.guide-stage').classList.add('speaking');$('#listen').textContent='Ⅱ 暂停介绍';track.onended=()=>{if(version===storyPlayback)stopGuide();};track.onerror=()=>{if(version!==storyPlayback)return;stopGuide();discovery.textContent='语音暂未加载，故事文字可以直接阅读。';};track.play().catch(()=>{if(version!==storyPlayback)return;stopGuide();discovery.textContent='再点“听小陶介绍”播放语音。';});}
  function selectTopic(i,play=true){stopGuide();topic=i;visited.add(i);heading.textContent=topics[i][0];$('#topic-body').textContent=topics[i][1];discovery.textContent=topics[i][2];$('.story-counter').textContent='故事 0'+(i+1)+' / 05';$('#listen').textContent='▶ 听小陶介绍';document.querySelectorAll('.story-topics button').forEach((b,n)=>b.setAttribute('aria-pressed',String(n===i)));$('.guide-progress').innerHTML=topics.map((_,n)=>'<span class="'+(visited.has(n)?'visited':'')+'">'+(n+1)+'</span>').join('');if(play)playGuide();}
  topics.forEach(([label],i)=>{const b=document.createElement('button');b.innerHTML='<span>0'+(i+1)+'</span>'+label;b.onclick=()=>selectTopic(i);$('#topic-list').append(b);});
  $('#listen').onclick=()=>narration&&!narration.paused?stopGuide():playGuide();
