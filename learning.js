@@ -12,6 +12,6 @@
   finishChat(id,answer,error=''){const item=data.chats.find(c=>c.id===id);if(item){item.answer=answer;item.status=error?'failed':'complete';item.error=error;persist()}},
   complete(){data.completedAt=data.completedAt||new Date().toISOString();persist()},
   reset(){data=fresh();persist()},
-  summary(){const answers=Object.values(data.answers);const correct=answers.filter(a=>a.correct).length;return {answered:answers.length,correct,accuracy:answers.length?Math.round(correct/answers.length*100):null,total:13,dialogues:data.chats.filter(c=>c.status==='complete').length}}
+  summary(){const answers=Object.values(data.answers);const correct=answers.filter(a=>a.correct).length;return {answered:answers.length,correct,accuracy:answers.length?Math.round(correct/answers.length*100):null,total:14,dialogues:data.chats.filter(c=>c.status==='complete').length}}
  };
 })();
