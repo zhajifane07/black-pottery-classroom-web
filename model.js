@@ -177,6 +177,7 @@
    const section=document.querySelector('section.book:not([hidden])'),host=section?.querySelector('[data-model-slot]');
    if(host){host.append(figure,controls);lastWidth=0;lastHeight=0;lastTime=0;window.potteryPatternReady=applyPattern();schedule()}
   }
+  document.addEventListener('lesson:route',()=>{for(const id of pointers.keys())try{canvas.releasePointerCapture(id)}catch{}pointers.clear();pinch=0;dragging=false;});
   document.addEventListener('lesson:route',mount);document.addEventListener('pottery:pattern',()=>{if(patternLeft)window.potteryPatternReady=applyPattern()});
   document.addEventListener('pottery:gallery',()=>{if(window.potteryLessonView?.chapter==='observe'){applyGallery(false);schedule();}});
   initializePattern();

@@ -3,7 +3,8 @@
  const scene=document.createElement('div');scene.id='cover-scene';scene.innerHTML='<div class="cover-scene-backdrop"></div><div class="closed-volume"><div class="cover-face"><div class="cover-front"><div class="cover-border"></div><div class="binding"><i></i><i></i><i></i><i></i></div><span class="cover-edition">雄州风物 · 少年考察</span><div class="title-slip"><span>陶火成器</span><h1>黑陶考察手记</h1></div><div class="cover-seal">雄州<br>陶记</div><button class="open-book">启卷 · 开始考察</button></div><div class="cover-back"></div></div><div class="cover-caption">翻开一册书，走近一方陶</div></div>';document.body.append(scene);
  const volume=scene.querySelector('.closed-volume'),face=scene.querySelector('.cover-face'),back=scene.querySelector('.cover-back'),backdrop=scene.querySelector('.cover-scene-backdrop'),button=scene.querySelector('button');
  const reduced=matchMedia('(prefers-reduced-motion: reduce), (max-width:760px)');
- let busy=false;
+ let busy=false,openingMotions=[];
+ addEventListener('resize',()=>{for(const animation of openingMotions)try{animation.finish()}catch{}});
  function resetAnimations(){for(const el of [volume,face,backdrop,scene])for(const animation of el.getAnimations())animation.cancel();document.querySelectorAll('main .book,header,footer,.chapter-nav').forEach(el=>el.getAnimations().forEach(a=>a.cancel()))}
  button.onclick=async()=>{
   if(busy)return;busy=true;button.disabled=true;
@@ -24,7 +25,7 @@
     const faceMotion=face.animate([{transform:'rotateY(0deg)'},{transform:'rotateY(-180deg)'}],{duration:1250,easing:'cubic-bezier(.35,.06,.2,1)',fill:'forwards'});
     backdrop.animate([{opacity:1},{opacity:0}],{duration:1100,fill:'forwards'});
     for(const el of document.querySelectorAll('header,footer,.chapter-nav'))el.animate([{opacity:0},{opacity:1}],{delay:650,duration:600,fill:'both'});
-    await Promise.all([bookMotion.finished,volumeMotion.finished,faceMotion.finished]);
+    openingMotions=[bookMotion,volumeMotion,faceMotion];await Promise.all(openingMotions.map(animation=>animation.finished));openingMotions=[];
     scene.style.display='none';bookMotion.cancel();back.replaceChildren();
    }else{document.body.classList.remove('closed');scene.style.display='none'}
    document.dispatchEvent(new CustomEvent('lesson:route',{detail:{id:book.id}}));

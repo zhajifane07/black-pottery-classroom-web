@@ -14,6 +14,11 @@
  document.querySelector('#stop-audio').onclick=()=>{stop();status.textContent='已停止播报。'};
  document.querySelector('#listen').onclick=()=>{speak(document.querySelector('#topic-body').textContent).catch(e=>status.textContent=e.message)};
  async function startRecording(){
+  if(window.potteryNativeRecord){
+   stop();document.dispatchEvent(new Event('voice:play'));status.textContent='请允许应用使用麦克风…';await window.potteryNativeRecord.start();
+   if(location.hash!=='#learn'||document.body.classList.contains('closed')){await window.potteryNativeRecord.stop(true);return;}
+   recorder={native:true,timer:setTimeout(()=>finishRecording(),30000)};record.classList.add('recording');record.setAttribute('aria-pressed','true');record.textContent='■ 说完了，发送';send.disabled=true;input.disabled=true;status.textContent='正在录音，最长30秒。点击“说完了，发送”结束。';return;
+  }
   if(!navigator.mediaDevices?.getUserMedia)throw Error('当前浏览器不支持录音，请在平板的 Safari、Chrome 或 Edge 中打开 HTTPS 网址');
   stop();document.dispatchEvent(new Event('voice:play'));status.textContent='请在浏览器提示中允许使用麦克风…';const stream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,channelCount:1}});
   if(location.hash!=='#learn'||document.body.classList.contains('closed')){stream.getTracks().forEach(t=>t.stop());return;}
@@ -24,15 +29,23 @@
   recorder={stream,context,source,processor,silence,parts,timer};record.classList.add('recording');record.setAttribute('aria-pressed','true');record.textContent='■ 说完了，发送';send.disabled=true;input.disabled=true;status.textContent='正在录音，最长30秒。点击“说完了，发送”结束。';
  }
  async function finishRecording(cancel=false){
-  if(!recorder)return;const r=recorder;recorder=null;clearTimeout(r.timer);r.processor.onaudioprocess=null;r.source.disconnect();r.processor.disconnect();r.silence.disconnect();r.stream.getTracks().forEach(t=>t.stop());await r.context.close();record.textContent='● 点击录音';
+  if(!recorder)return;const r=recorder;recorder=null;clearTimeout(r.timer);
+  record.textContent='● 点击录音';record.classList.remove('recording');record.setAttribute('aria-pressed','false');send.disabled=busy;input.disabled=busy;
+  if(r.native){
+   try{const recording=await window.potteryNativeRecord.stop(cancel);if(cancel){status.textContent='录音已取消。';return;}await transcribe(new Uint8Array(0),recording.recordingId);}catch(error){status.textContent='录音未完成。'+error.message;setBusy(false);}return;
+  }
+  r.processor.onaudioprocess=null;r.source.disconnect();r.processor.disconnect();r.silence.disconnect();r.stream.getTracks().forEach(t=>t.stop());await r.context.close();
   record.classList.remove('recording');record.setAttribute('aria-pressed','false');send.disabled=busy;input.disabled=busy;
   if(cancel){status.textContent='录音已取消。';return}
   const length=r.parts.reduce((n,p)=>n+p.length,0);if(length<r.context.sampleRate*.3){status.textContent='录音太短，请再说一次。';return}
   const wav=new ArrayBuffer(44+length*2),view=new DataView(wav);const write=(offset,text)=>[...text].forEach((ch,i)=>view.setUint8(offset+i,ch.charCodeAt(0)));
   write(0,'RIFF');view.setUint32(4,36+length*2,true);write(8,'WAVE');write(12,'fmt ');view.setUint32(16,16,true);view.setUint16(20,1,true);view.setUint16(22,1,true);view.setUint32(24,r.context.sampleRate,true);view.setUint32(28,r.context.sampleRate*2,true);view.setUint16(32,2,true);view.setUint16(34,16,true);write(36,'data');view.setUint32(40,length*2,true);let offset=44;
   for(const part of r.parts)for(const sample of part){const v=Math.max(-1,Math.min(1,sample));view.setInt16(offset,v<0?v*32768:v*32767,true);offset+=2}
-  setBusy(true);status.textContent='正在识别你的话…';
-  try{const response=await (window.classroomFetch||fetch)('/api/transcribe',{method:'POST',headers:{'Content-Type':'audio/wav'},body:wav});const data=await response.json();if(!response.ok)throw Error(data.error);setBusy(false);await ask(data.text)}catch(e){status.textContent='录音识别失败。'+e.message}finally{setBusy(false)}
+  await transcribe(wav);
+ }
+ async function transcribe(wav,recordingId){
+  setBusy(true);status.textContent='正在识别你的话…';const headers={'Content-Type':'audio/wav'};if(recordingId)headers['X-Pottery-Recording']=recordingId;
+  try{const response=await (window.classroomFetch||fetch)('/api/transcribe',{method:'POST',headers,body:wav,signal:AbortSignal.timeout(75000)});const data=await response.json();if(!response.ok)throw Error(data.error);setBusy(false);await ask(data.text)}catch(e){status.textContent='录音识别失败。'+e.message}finally{setBusy(false)}
  }
  record.onclick=()=>{if(recorder){finishRecording();return}if(!busy){record.disabled=true;startRecording().catch(e=>{status.textContent=e.name==='NotAllowedError'?'麦克风未获允许。请点地址栏的权限图标，允许麦克风后再录音。':e.name==='NotFoundError'?'没有找到麦克风，请连接麦克风后重试。':'无法开始录音。'+e.message;}).finally(()=>record.disabled=false)}};
  document.addEventListener('guide:play',()=>{stop();if(recorder)finishRecording(true);});
